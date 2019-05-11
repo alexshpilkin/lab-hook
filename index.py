@@ -35,9 +35,24 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 
 		if event['ref'] != 'refs/heads/master':
 			return self.send_success()
+
 		commit = urlload(event['repository']['commits_url']
 		                      .replace('{/sha}', '/' + event['after']))
-		pprint(commit)
+		tree = urlload(commit['commit']['tree']['url'])
+		for file in tree['tree']:
+			if file['path'] == 'iodide.json':
+				break
+		else:
+			self.send_success()
+			self.wfile.write('no iodide.json found'
+			                 .encode('ascii'))
+			return
+		if file['type'] != 'blob':
+			self.send_error('400')
+			self.wfile.write('iodide.json is not a file'
+			                 .encode('ascii'))
+			return
+		pprint(file)
 
 		self.send_success()
 		self.wfile.write('New head: {}\r\n'
