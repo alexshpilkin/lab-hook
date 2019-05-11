@@ -39,19 +39,15 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 		commit = urlload(event['repository']['commits_url']
 		                      .replace('{/sha}', '/' + event['after']))
 		tree = urlload(commit['commit']['tree']['url'])
-		for file in tree['tree']:
-			if file['path'] == 'iodide.json':
-				break
-		else:
+		files = {file['path']: file for file in tree['tree']}
+		file = files.get('iodide.json')
+		if file is None:
 			self.send_success()
 			self.wfile.write('no iodide.json found'
 			                 .encode('ascii'))
 			return
 		if file['type'] != 'blob':
-			self.send_error('400')
-			self.wfile.write('iodide.json is not a file'
-			                 .encode('ascii'))
-			return
+			return self.send_error('400')
 		req = Request(file['url'],
 		              headers={'Accept': 'application/vnd.github.raw'})
 		with urlopen(req) as file:
@@ -66,9 +62,7 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 				           for v in notebooks.values()):
 					raise ValueError('not a string')
 			except ValueError as e:
-				self.wfile.write('error in iodide.json: {}'
-				                 .format(e))
-		pprint(notebooks)
+				return self.send_error(400)
 
 		self.send_success()
 		self.wfile.write('New head: {}\r\n'
