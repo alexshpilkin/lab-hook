@@ -5,8 +5,8 @@ from urllib.request import Request, urlopen
 
 
 def urlload(*args, **kwargs):
-	with urlopen(*args, **kwargs) as file:
-		return loads(file.read())
+	with urlopen(*args, **kwargs) as fp:
+		return loads(fp.read())
 
 
 class HTTPRequestHandler(BaseHTTPRequestHandler):
@@ -38,8 +38,12 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 
 		commit = urlload(event['repository']['commits_url']
 		                      .replace('{/sha}', '/' + event['after']))
-		tree = urlload(commit['commit']['tree']['url'])
+		tree = urlload(commit['commit']['tree']['url'] +
+		               '?recursive=1')
+		if tree.get('truncated', False):
+			self.send_error(500)
 		files = {file['path']: file for file in tree['tree']}
+
 		file = files.get('iodide.json')
 		if file is None:
 			self.send_success()
@@ -50,9 +54,9 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 			return self.send_error('400')
 		req = Request(file['url'],
 		              headers={'Accept': 'application/vnd.github.raw'})
-		with urlopen(req) as file:
+		with urlopen(req) as fp:
 			try:
-				config = loads(file.read())
+				config = loads(fp.read())
 				if not isinstance(config, dict):
 					raise ValueError('not a dictionary')
 				notebooks = config.get('notebooks', {})
@@ -63,6 +67,16 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 					raise ValueError('not a string')
 			except ValueError as e:
 				return self.send_error(400)
+
+		for name, url in notebooks.items():
+			file = files.get(name)
+			if file is None:
+				return self.send_error(400)
+			req = Request(file['url'],
+			              headers={'Accept': 'application/vnd.github.raw'})
+			with urlopen(req) as fp:
+				data = fp.read()
+			print(name, url, data)
 
 		self.send_success()
 		self.wfile.write('New head: {}\r\n'
