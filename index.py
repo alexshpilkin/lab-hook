@@ -1,6 +1,13 @@
 from http.server import BaseHTTPRequestHandler
-from json import loads, dumps
+from json import loads
 from pprint import pprint
+from urllib.request import urlopen
+
+
+def urlload(*args, **kwargs):
+	with urlopen(*args, **kwargs) as file:
+		return loads(file.read())
+
 
 class HTTPRequestHandler(BaseHTTPRequestHandler):
 	def do_GET(self):
@@ -25,10 +32,13 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 			event  = loads(self.rfile.read(length))
 		except ValueError:
 			self.send_error(400)
-		pprint(event)
 
 		if event['ref'] != 'refs/heads/master':
 			return self.send_success()
+		commit = urlload(event['repository']['commits_url']
+		                      .replace('{/sha}', '/' + event['after']))
+		pprint(commit)
+
 		self.send_success()
 		self.wfile.write('New head: {}\r\n'
 		                 .format(event['after'])
