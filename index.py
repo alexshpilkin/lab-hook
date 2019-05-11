@@ -1,7 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 from json import loads
 from pprint import pprint
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 
 def urlload(*args, **kwargs):
@@ -52,7 +52,23 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 			self.wfile.write('iodide.json is not a file'
 			                 .encode('ascii'))
 			return
-		pprint(file)
+		req = Request(file['url'],
+		              headers={'Accept': 'application/vnd.github.raw'})
+		with urlopen(req) as file:
+			try:
+				config = loads(file.read())
+				if not isinstance(config, dict):
+					raise ValueError('not a dictionary')
+				notebooks = config.get('notebooks', {})
+				if not isinstance(notebooks, dict):
+					raise ValueError('not a dictionary')
+				if not all(isinstance(v, str)
+				           for v in notebooks.values()):
+					raise ValueError('not a string')
+			except ValueError as e:
+				self.wfile.write('error in iodide.json: {}'
+				                 .format(e))
+		pprint(notebooks)
 
 		self.send_success()
 		self.wfile.write('New head: {}\r\n'
