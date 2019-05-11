@@ -10,6 +10,11 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 		self.wfile.write(b'Hello world!\r\n')
 		self.wfile.write('Path: {}\r\n'.format(self.path).encode('ascii'))
 
+	def send_success(self):
+		self.send_response(200)
+		self.send_header('Content-Type', 'text/plain')
+		self.end_headers()
+
 	def do_POST(self):
 		if self.path != '/':
 			self.send_error(404)
@@ -22,11 +27,13 @@ class HTTPRequestHandler(BaseHTTPRequestHandler):
 			self.send_error(400)
 		pprint(event)
 
-		self.send_response(200)
-		self.send_header('Content-Type', 'text/plain')
-		self.end_headers()
-		self.wfile.write(b'Hello world!\r\n')
-		self.wfile.write(dumps(event).encode('ascii'))
+		if event['ref'] != 'refs/heads/master':
+			return self.send_success()
+		self.send_success()
+		self.wfile.write('New head: {}\r\n'
+		                 .format(event['after'])
+		                 .encode('ascii'))
+
 
 if __name__ == '__main__':
 	from http.server import HTTPServer
